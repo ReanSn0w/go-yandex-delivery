@@ -56,15 +56,26 @@ type (
 	Reason               string // Описание причины переноса/отмены
 )
 
+func (l LastMilePolicy) DestinationType() string {
+	switch l {
+	case LMP_TimeInterval:
+		return "custom_location"
+	case LMP_SelfPickup:
+		return "platform_station"
+	default:
+		return "unknown"
+	}
+}
+
 type PredictPriceRequest struct {
-	Source             Source        `json:"source"`
-	Destination        Destination   `json:"destination"`
-	PaymentMethod      PaymentMethod `json:"payment_method"`
-	Places             []Place       `json:"places"`
-	Tariff             string        `json:"tariff"`               // Тариф доставки
-	TotalWeight        int64         `json:"total_weight"`         // Cуммарный вес посылки в граммах
-	TotalAssessedPrice int64         `json:"total_assessed_price"` // Суммарная оценочная стоимость посылок в копейках
-	ClientPrice        int64         `json:"client_price"`         // Cумма к оплате с получателя в копейках
+	Source             Source         `json:"source"`
+	Destination        Destination    `json:"destination"`
+	PaymentMethod      PaymentMethod  `json:"payment_method"`
+	Places             []Place        `json:"places"`
+	Tariff             LastMilePolicy `json:"tariff"`               // Тариф доставки
+	TotalWeight        int64          `json:"total_weight"`         // Cуммарный вес посылки в граммах
+	TotalAssessedPrice int64          `json:"total_assessed_price"` // Суммарная оценочная стоимость посылок в копейках
+	ClientPrice        int64          `json:"client_price"`         // Cумма к оплате с получателя в копейках
 }
 
 // Информация о точке получения заказа
@@ -84,7 +95,7 @@ type Destination struct {
 	IntervalUTC *IntervalUTC `json:"interval_utc,omitempty"`
 
 	//ID ПВЗ или постамата, зарегистрированного в платформе, в который нужна доставка
-	PlatformStationID any `json:"platform_station_id,omitempty"`
+	PlatformStationID string `json:"platform_station_id,omitempty"`
 
 	// Адрес получения с указанием города, улицы и номера дома.
 	// Номер квартиры, подъезда и этаж указывать не нужно
@@ -109,9 +120,9 @@ type PhysicalDims struct {
 // Информация о точке отправления заказа
 type Source struct {
 	// ID склада отправки, зарегистрированного в платформе
-	PlatformStationID string          `json:"platform_station_id,omitempty"`
-	PlatformStation   PlatformStation `json:"platform_station,omitempty"`
-	IntervalUTC       IntervalUTC     `json:"interval_utc,omitempty"`
+	PlatformStationID string           `json:"platform_station_id,omitempty"`
+	PlatformStation   *PlatformStation `json:"platform_station,omitempty"`
+	IntervalUTC       *IntervalUTC     `json:"interval_utc,omitempty"`
 }
 
 type PredictPriceResponse struct {
@@ -166,16 +177,16 @@ type DeliveryPointsRequest struct {
 	PickupPointIDS []string `json:"pickup_point_ids"`
 
 	// Идентификатор населенного пункта (geo_id)
-	GeoID                      int64              `json:"geo_id"`
-	Longitude                  CoordinateInterval `json:"longitude"`                      // Интервал для выбора всех объектов в отрезке по долготе.
-	Latitude                   CoordinateInterval `json:"latitude"`                       // Интервал для выбора всех объектов в отрезке по широте.
-	Type                       PickupStationType  `json:"type"`                           // Тип точки приема/выдачи заказа.
-	PaymentMethod              PaymentMethod      `json:"payment_method"`                 // Тип оплаты в точке самостоятельного получения заказа.
-	AvailableForDropoff        bool               `json:"available_for_dropoff"`          // Возможность отгрузки заказов в точку (самопривоз).
-	IsYandexBranded            bool               `json:"is_yandex_branded"`              // Признак брендированные ли ПВЗ.
-	IsNotBrandedPartnerStation bool               `json:"is_not_branded_partner_station"` // Признак добавляющий партнерские ПВЗ.
-	IsPostOffice               bool               `json:"is_post_office"`                 // Признак добавляющий ПВЗ почты россии.
-	PaymentMethods             []string           `json:"payment_methods"`                // Набор типов оплаты, которы должны быть доступны в самостоятельного точке получения заказа.
+	GeoID                      int64               `json:"geo_id"`
+	Longitude                  *CoordinateInterval `json:"longitude,omitempty"`                      // Интервал для выбора всех объектов в отрезке по долготе.
+	Latitude                   *CoordinateInterval `json:"latitude,omitempty"`                       // Интервал для выбора всех объектов в отрезке по широте.
+	Type                       PickupStationType   `json:"type,omitempty"`                           // Тип точки приема/выдачи заказа.
+	PaymentMethod              PaymentMethod       `json:"payment_method,omitempty"`                 // Тип оплаты в точке самостоятельного получения заказа.
+	AvailableForDropoff        bool                `json:"available_for_dropoff,omitempty"`          // Возможность отгрузки заказов в точку (самопривоз).
+	IsYandexBranded            bool                `json:"is_yandex_branded,omitempty"`              // Признак брендированные ли ПВЗ.
+	IsNotBrandedPartnerStation bool                `json:"is_not_branded_partner_station,omitempty"` // Признак добавляющий партнерские ПВЗ.
+	IsPostOffice               bool                `json:"is_post_office,omitempty"`                 // Признак добавляющий ПВЗ почты россии.
+	PaymentMethods             []PaymentMethod     `json:"payment_methods,omitempty"`                // Набор типов оплаты, которы должны быть доступны в самостоятельного точке получения заказа.
 }
 
 type CoordinateInterval struct {
@@ -220,11 +231,11 @@ type Address struct {
 }
 
 type Contact struct {
-	FirstName  string `json:"first_name"` // Имя
-	LastName   string `json:"last_name"`  // Фамилия
-	Partonymic string `json:"partonymic"` // Отчество
-	Phone      string `json:"phone"`      // Телефон
-	Email      string `json:"email"`      // Электронная почта
+	FirstName  string `json:"first_name"`           // Имя
+	LastName   string `json:"last_name,omitempty"`  // Фамилия
+	Partonymic string `json:"partonymic,omitempty"` // Отчество
+	Phone      string `json:"phone"`                // Телефон
+	Email      string `json:"email,omitempty"`      // Электронная почта
 }
 
 type Dayoff struct {
@@ -232,8 +243,8 @@ type Dayoff struct {
 }
 
 type Position struct {
-	Latitude  int64 `json:"latitude"`  // Широта
-	Longitude int64 `json:"longitude"` // Долгота
+	Latitude  float64 `json:"latitude"`  // Широта
+	Longitude float64 `json:"longitude"` // Долгота
 }
 
 type Schedule struct {
@@ -278,21 +289,21 @@ type BillingInfo struct {
 	PaymentMethod PaymentMethod `json:"payment_method"` // Метод оплаты
 
 	// Сумма, которую нужно взять с получателя за доставку. Актуально только для заказов с постоплатой (типы оплаты cash_on_receipt и card_on_receipt)
-	DeliveryCost int64 `json:"delivery_cost"`
+	DeliveryCost int64 `json:"delivery_cost,omitempty"`
 }
 
 type CustomLocation struct {
-	Latitude  int64   `json:"latitude"`  // Широта
-	Longitude int64   `json:"longitude"` // Долгота
-	Details   Address `json:"details"`   // Детали
+	Latitude  float64 `json:"latitude,omitempty"`  // Широта
+	Longitude float64 `json:"longitude,omitempty"` // Долгота
+	Details   Address `json:"details"`             // Детали
 }
 
 type BillingDetails struct {
 	// Значение НДС.
 	// Допустимые значения — 0, 5, 7, 10, 20.
 	// Если заказ без НДС, передавайте значение -1
-	NDS               int64  `json:"nds"`
-	Inn               string `json:"inn"`                 // ИНН
+	NDS               int64  `json:"nds,omitempty"`
+	Inn               string `json:"inn,omitempty"`       // ИНН
 	UnitPrice         int64  `json:"unit_price"`          // Цена за единицу товара (передается в копейках)
 	AssessedUnitPrice int64  `json:"assessed_unit_price"` // Оценочная цена за единицу товара (передается в копейках)
 }
@@ -364,14 +375,14 @@ type Info struct {
 }
 
 type Item struct {
-	Count          int64          `json:"count"`           // Количество товара
-	Name           string         `json:"name"`            // Название товара
-	Article        string         `json:"article"`         // Артикул товара
-	MarkingCode    string         `json:"marking_code"`    // Код маркировки товара
-	Uin            string         `json:"uin"`             // Уникальный идентификатор товара
-	BillingDetails BillingDetails `json:"billing_details"` // Детали оплаты товара
-	PhysicalDims   PhysicalDims   `json:"physical_dims"`   // Физические размеры товара
-	PlaceBarcode   string         `json:"place_barcode"`   // Штрихкод места хранения товара
+	Count          int64          `json:"count"`                   // Количество товара
+	Name           string         `json:"name"`                    // Название товара
+	Article        string         `json:"article"`                 // Артикул товара
+	MarkingCode    string         `json:"marking_code,omitempty"`  // Код маркировки товара
+	Uin            string         `json:"uin,omitempty"`           // Уникальный идентификатор товара
+	BillingDetails BillingDetails `json:"billing_details"`         // Детали оплаты товара
+	PhysicalDims   *PhysicalDims  `json:"physical_dims,omitempty"` // Физические размеры товара
+	PlaceBarcode   string         `json:"place_barcode"`           // Штрихкод места хранения товара
 }
 
 type State struct {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -39,11 +40,14 @@ func (d *Delivery) request(path string) *web.JsonRequest {
 // is_oversized - Флаг КГТ
 func (d *Delivery) GetPredictedPrice(isOversized bool, req PredictPriceRequest) (*PredictPriceResponse, error) {
 	res := PredictPriceResponse{}
-	err := d.request("/pricing-calculator").
+	if err := d.request("/pricing-calculator").
+		SetMethod(http.MethodPost).
 		SetQuery("is_oversized", fmt.Sprint(isOversized)).
 		SetBody(req).
-		Do(&res)
-	return &res, err
+		Do(&res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
 
 // GetDeliveryIntervals возвращает интервалы доставки
@@ -51,9 +55,10 @@ func (d *Delivery) GetPredictedPrice(isOversized bool, req PredictPriceRequest) 
 func (d *Delivery) GetDeliveryIntervals(isOversized bool, lastMilePolicy LastMilePolicy, req DeliveryIntervalsRequest) (*DeliveryIntervalsResponse, error) {
 	res := DeliveryIntervalsResponse{}
 	err := d.request("/offers/info").
+		SetMethod(http.MethodPost).
 		SetQuery("is_oversized", fmt.Sprint(isOversized)).
 		SetQuery("last_mile_policy", string(lastMilePolicy)).
-		SetQuery("send_unix", "true").
+		SetQuery("send_unix", "false").
 		SetBody(req).
 		Do(&res)
 	return &res, err
@@ -62,7 +67,8 @@ func (d *Delivery) GetDeliveryIntervals(isOversized bool, lastMilePolicy LastMil
 // GetLocationID возвращает идентификатор населенного пункта
 func (d *Delivery) GetLocationID(address string) (*LocationIDResponse, error) {
 	res := LocationIDResponse{}
-	err := d.request("/location/id").
+	err := d.request("/location/detect").
+		SetMethod(http.MethodPost).
 		SetBody(map[string]any{"location": address}).
 		Do(&res)
 	return &res, err
@@ -71,7 +77,8 @@ func (d *Delivery) GetLocationID(address string) (*LocationIDResponse, error) {
 // GetDeliveryPoints возвращает список точек самовывоза и ПВЗ
 func (d *Delivery) GetDeliveryPoints(req DeliveryPointsRequest) (*DeliveryPointsResponse, error) {
 	res := DeliveryPointsResponse{}
-	err := d.request("/ickup-points/list").
+	err := d.request("/pickup-points/list").
+		SetMethod(http.MethodPost).
 		SetBody(req).
 		Do(&res)
 	return &res, err
@@ -81,7 +88,8 @@ func (d *Delivery) GetDeliveryPoints(req DeliveryPointsRequest) (*DeliveryPoints
 func (d *Delivery) CreateOffer(req CreateOfferRequest) (*CreateOfferResponse, error) {
 	res := CreateOfferResponse{}
 	err := d.request("/offers/create").
-		SetQuery("send_unix", "true").
+		SetMethod(http.MethodPost).
+		SetQuery("send_unix", "false").
 		SetBody(req).
 		Do(&res)
 	return &res, err

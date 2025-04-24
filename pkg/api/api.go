@@ -8,6 +8,14 @@ import (
 	"github.com/ReanSn0w/gokit/pkg/web"
 )
 
+func New(environment utils.Environment, client web.HTTPClient, token string) *API {
+	return &API{
+		environment: environment,
+		client:      client,
+		token:       token,
+	}
+}
+
 type API struct {
 	environment utils.Environment
 	client      web.HTTPClient
