@@ -1,6 +1,11 @@
 package delivery
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+const customTimeLayout = "2006-01-02T15:04:05-0700"
 
 const (
 	PM_AlreadyPaid    PaymentMethod = "already_paid"
@@ -110,11 +115,11 @@ type Place struct {
 }
 
 type PhysicalDims struct {
-	WeightGross      int64 `json:"weight_gross"`      // Вес брутто, граммы
-	Dx               int64 `json:"dx"`                // Длина, сантиметры
-	Dy               int64 `json:"dy"`                // Высота, сантиметры
-	Dz               int64 `json:"dz"`                // Ширина, сантиметры
-	PredefinedVolume int64 `json:"predefined_volume"` // Объем (в см3)
+	WeightGross      float64 `json:"weight_gross"`      // Вес брутто, граммы
+	Dx               float64 `json:"dx"`                // Длина, сантиметры
+	Dy               float64 `json:"dy"`                // Высота, сантиметры
+	Dz               float64 `json:"dz"`                // Ширина, сантиметры
+	PredefinedVolume float64 `json:"predefined_volume"` // Объем (в см3)
 }
 
 // Информация о точке отправления заказа
@@ -268,22 +273,7 @@ type Time struct {
 	Minutes int64 `json:"minutes"` // Минуты
 }
 
-type CreateOfferRequest struct {
-	Info           Info           `json:"info"`             // Базовый набор метаданных по запросу
-	Source         Source         `json:"source"`           // Информация о точке отправления заказа
-	Destination    Destination    `json:"destination"`      // Информация о точке получения заказа
-	Items          []Item         `json:"items"`            // Информация о предметах в заказе
-	Places         []Place        `json:"places"`           // Информация о местах в заказе
-	BillingInfo    BillingInfo    `json:"billing_info"`     // Данные для биллинга
-	RecipientInfo  Contact        `json:"recipient_info"`   // Данные о получателе
-	LastMilePolicy LastMilePolicy `json:"last_mile_policy"` // Требуемый способ доставки
-
-	// Разрешен ли частичный выкуп
-	// true — разрешен частичный выкуп заказа
-	// false — частичный выкуп заказа недоступен
-	// Значение по умолчанию: false
-	ParticularItemsRefuse bool `json:"particular_items_refuse"`
-}
+type CreateOfferRequest RequestInfo
 
 type BillingInfo struct {
 	PaymentMethod PaymentMethod `json:"payment_method"` // Метод оплаты
@@ -365,6 +355,41 @@ type IntervalUTC struct {
 	To   time.Time `json:"to"`
 }
 
+// UnmarshalJSON parses JSON string to IntervalUTC
+func (i *IntervalUTC) UnmarshalJSON(data []byte) error {
+	// Create a temporary structure to avoid recursion
+	var raw map[string]string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	// Parse the "from" time
+	from, err := time.Parse(customTimeLayout, raw["from"])
+	if err != nil {
+		return err
+	}
+	i.From = from
+
+	// Parse the "to" time
+	to, err := time.Parse(customTimeLayout, raw["to"])
+	if err != nil {
+		return err
+	}
+	i.To = to
+
+	return nil
+}
+
+// MarshalJSON serializes IntervalUTC to JSON string
+func (i IntervalUTC) MarshalJSON() ([]byte, error) {
+	// Create a map to serialize
+	raw := map[string]string{
+		"from": i.From.Format(customTimeLayout),
+		"to":   i.To.Format(customTimeLayout),
+	}
+	return json.Marshal(raw)
+}
+
 type PlatformStation struct {
 	PlatformID string `json:"platform_id"`
 }
@@ -406,16 +431,22 @@ type RequestElement struct {
 }
 
 type RequestInfo struct {
-	Info                  Info             `json:"info"`
-	Source                Source           `json:"source"`
-	Destination           Destination      `json:"destination"`
-	Items                 []Item           `json:"items"`
-	Places                []Place          `json:"places"`
-	BillingInfo           BillingInfo      `json:"billing_info"`
-	RecipientInfo         Contact          `json:"recipient_info"`
-	LastMilePolicy        LastMilePolicy   `json:"last_mile_policy"`
-	ParticularItemsRefuse bool             `json:"particular_items_refuse"`
-	AvailableActions      AvailableActions `json:"available_actions"`
+	Info           Info           `json:"info"`             // Базовый набор метаданных по запросу
+	Source         Source         `json:"source"`           // Информация о точке отправления заказа
+	Destination    Destination    `json:"destination"`      // Информация о точке получения заказа
+	Items          []Item         `json:"items"`            // Информация о предметах в заказе
+	Places         []Place        `json:"places"`           // Информация о местах в заказе
+	BillingInfo    BillingInfo    `json:"billing_info"`     // Данные для биллинга
+	RecipientInfo  Contact        `json:"recipient_info"`   // Данные о получателе
+	LastMilePolicy LastMilePolicy `json:"last_mile_policy"` // Требуемый способ доставки
+
+	// Разрешен ли частичный выкуп
+	// true — разрешен частичный выкуп заказа
+	// false — частичный выкуп заказа недоступен
+	// Значение по умолчанию: false
+	ParticularItemsRefuse bool `json:"particular_items_refuse"`
+
+	AvailableActions *AvailableActions `json:"available_actions,omitempty"`
 }
 
 type GetRequestActualInfoResponse struct {
@@ -482,22 +513,7 @@ type CancelRequestResponse struct {
 	Description string `json:"description"` // Комментарий к результату выполнения запроса
 }
 
-type CreateRequestRequest struct {
-	Info           Info           `json:"info"`             // Базовый набор метаданных по запросу
-	Source         Source         `json:"source"`           // Информация о точке отправления заказа
-	Destination    Destination    `json:"destination"`      // Информация о точке получения заказа
-	Items          []Item         `json:"items"`            // Информация о предметах в заказе
-	Places         []Place        `json:"places"`           // Информация о местах в заказе
-	BillingInfo    BillingInfo    `json:"billing_info"`     // Данные для биллинга
-	RecipientInfo  Contact        `json:"recipient_info"`   // Данные о получателе
-	LastMilePolicy LastMilePolicy `json:"last_mile_policy"` // Требуемый способ доставки
-
-	// Разрешен ли частичный выкуп
-	// true — разрешен частичный выкуп заказа
-	// false — частичный выкуп заказа недоступен
-	// Значение по умолчанию: false
-	ParticularItemsRefuse bool `json:"particular_items_refuse"`
-}
+type CreateRequestRequest RequestInfo
 
 type CreateRequestResponse struct {
 	RequestID string `json:"request_id"` // Идентификатор только что созданного заказа

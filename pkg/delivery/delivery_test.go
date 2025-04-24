@@ -1,7 +1,6 @@
 package delivery_test
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -17,8 +16,9 @@ import (
 )
 
 var (
-	l lgr.L
-	d *delivery.Delivery
+	l       lgr.L
+	d       *delivery.Delivery
+	barcode = tool.NewID()
 
 	opts = struct {
 		app.Debug
@@ -238,8 +238,6 @@ func TestDelvivery_GetDeliveryPoints(t *testing.T) {
 }
 
 func TestDelivery_CreateOfferWOEditing(t *testing.T) {
-	barcode := tool.NewID()
-
 	cases := []struct {
 		Name     string
 		Region   string
@@ -293,7 +291,7 @@ func TestDelivery_CreateOfferWOEditing(t *testing.T) {
 			Request: delivery.CreateOfferRequest{
 				Info:           delivery.Info{OperatorRequestID: tool.NewID()},
 				Source:         delivery.Source{PlatformStation: &delivery.PlatformStation{PlatformID: "fbed3aa1-2cc6-4370-ab4d-59c5cc9bb924"}},
-				LastMilePolicy: delivery.LMP_TimeInterval,
+				LastMilePolicy: delivery.LMP_SelfPickup,
 				RecipientInfo:  delivery.Contact{FirstName: "Иван", Phone: "+79261234567"},
 				BillingInfo:    delivery.BillingInfo{PaymentMethod: delivery.PM_AlreadyPaid},
 				Items: func() []delivery.Item {
@@ -377,7 +375,7 @@ func TestDelivery_CreateOfferWOEditing(t *testing.T) {
 					},
 					CustomLocation: &delivery.CustomLocation{
 						Details: delivery.Address{
-							FullAddress: c.Request.Destination.Address,
+							FullAddress: "Москва, проспект Вернадского, 91к2",
 						},
 					},
 				}
@@ -402,19 +400,19 @@ func TestDelivery_CreateOfferWOEditing(t *testing.T) {
 
 			// Шаг 4: Подтверждаем созданный Offer.
 			confirmResp, confirmErr := d.ConfirmOffer(offerResp.Offers[0].OfferID)
-			assert.Nil(t, confirmErr)
+			assert.Nil(t, confirmErr, "%v", confirmErr)
 			if !assert.NotNil(t, confirmResp) {
 				return
 			}
 
 			// Шаг 5: Получаем информацию о заявке на доставку.
 			reqInfoResp, reqInfoErr := d.GetRequestInfo(confirmResp.RequestID, false)
-			assert.Nil(t, reqInfoErr)
+			assert.Nil(t, reqInfoErr, "%v", reqInfoErr)
 			assert.NotNil(t, reqInfoResp)
 
 			// Шаг 6: Отменяем заявку на доставку.
 			cancelResp, cancelErr := d.CancelRequest(confirmResp.RequestID)
-			assert.Nil(t, cancelErr)
+			assert.Nil(t, cancelErr, "%v", cancelErr)
 			assert.NotNil(t, cancelResp)
 		})
 	}
@@ -422,32 +420,154 @@ func TestDelivery_CreateOfferWOEditing(t *testing.T) {
 
 func TestDelivery_CreateOrderWOEditing(t *testing.T) {
 	cases := []struct {
-		Name             string
-		Address          string
-		CreateOfferReq   delivery.CreateOfferRequest
-		CreateRequestReq delivery.CreateRequestRequest
-		HasError         bool
-		RequestID        string
-		EditingTaskID    string
-	}{ /* заполняемые тестовые случаи */ }
+		Name     string
+		Region   string
+		Request  delivery.CreateOfferRequest
+		HasError bool
+	}{
+		{
+			Name:     "Успешное создание заявки на доставку",
+			HasError: false,
+			Region:   "Москва",
+			Request: delivery.CreateOfferRequest{
+				Info:           delivery.Info{OperatorRequestID: tool.NewID()},
+				Source:         delivery.Source{PlatformStation: &delivery.PlatformStation{PlatformID: "fbed3aa1-2cc6-4370-ab4d-59c5cc9bb924"}},
+				LastMilePolicy: delivery.LMP_TimeInterval,
+				RecipientInfo:  delivery.Contact{FirstName: "Иван", Phone: "+79261234567"},
+				BillingInfo:    delivery.BillingInfo{PaymentMethod: delivery.PM_AlreadyPaid},
+				Items: func() []delivery.Item {
+					id := tool.NewID()
+
+					return []delivery.Item{
+						{
+							Count:        1,
+							Name:         "Чехол для iPhone 16 Pro Max",
+							Article:      id,
+							PlaceBarcode: barcode,
+							BillingDetails: delivery.BillingDetails{
+								UnitPrice:         10000,
+								AssessedUnitPrice: 10000,
+							},
+						},
+					}
+				}(),
+				Places: []delivery.Place{
+					{
+						Barcode: barcode,
+						PhysicalDims: delivery.PhysicalDims{
+							WeightGross:      240,
+							Dx:               5,
+							Dy:               10,
+							Dz:               20,
+							PredefinedVolume: 1000,
+						},
+					},
+				},
+			},
+		},
+		// {
+		// 	Name:     "Успешное создание заявки на самовывоз",
+		// 	HasError: false,
+		// 	Region:   "Москва",
+		// 	Request: delivery.CreateOfferRequest{
+		// 		Info:           delivery.Info{OperatorRequestID: tool.NewID()},
+		// 		Source:         delivery.Source{PlatformStation: &delivery.PlatformStation{PlatformID: "fbed3aa1-2cc6-4370-ab4d-59c5cc9bb924"}},
+		// 		LastMilePolicy: delivery.LMP_SelfPickup,
+		// 		RecipientInfo:  delivery.Contact{FirstName: "Иван", Phone: "+79261234567"},
+		// 		BillingInfo:    delivery.BillingInfo{PaymentMethod: delivery.PM_AlreadyPaid},
+		// 		Items: func() []delivery.Item {
+		// 			id := tool.NewID()
+
+		// 			return []delivery.Item{
+		// 				{
+		// 					Count:        1,
+		// 					Name:         "Чехол для iPhone 16 Pro Max",
+		// 					Article:      id,
+		// 					PlaceBarcode: barcode,
+		// 					BillingDetails: delivery.BillingDetails{
+		// 						UnitPrice:         10000,
+		// 						AssessedUnitPrice: 10000,
+		// 					},
+		// 				},
+		// 			}
+		// 		}(),
+		// 		Places: []delivery.Place{
+		// 			{
+		// 				Barcode: barcode,
+		// 				PhysicalDims: delivery.PhysicalDims{
+		// 					WeightGross:      240,
+		// 					Dx:               5,
+		// 					Dy:               10,
+		// 					Dz:               20,
+		// 					PredefinedVolume: 1000,
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+	}
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			// Шаг 1: Получаем Location ID для указанного адреса.
-			locResp, locErr := d.GetLocationID(c.Address)
+			locResp, locErr := d.GetLocationID(c.Region)
 			assert.Nil(t, locErr)
-			assert.NotNil(t, locResp)
+			if !assert.NotNil(t, locResp) {
+				return
+			}
 
-			// Шаг 2: Получаем Delivery Points на основе Location ID.
-			c.CreateOfferReq.Source.PlatformStationID = fmt.Sprintf("%d", locResp.Variants[0].GeoID)
-			pointsResp, pointsErr := d.GetDeliveryPoints(delivery.DeliveryPointsRequest{
-				GeoID: locResp.Variants[0].GeoID,
-			})
-			assert.Nil(t, pointsErr)
-			assert.NotNil(t, pointsResp)
+			// Шаг 2: Корректируем запрос на создание заказа в зависимости от типа его получения
+			switch c.Request.LastMilePolicy {
+			case delivery.LMP_SelfPickup:
+				pointsResp, pointsErr := d.GetDeliveryPoints(delivery.DeliveryPointsRequest{
+					GeoID:                      locResp.Variants[0].GeoID,
+					Type:                       delivery.PST_PickupPoint,
+					PaymentMethod:              delivery.PM_AlreadyPaid,
+					IsNotBrandedPartnerStation: true,
+					IsPostOffice:               true,
+				})
+				assert.Nil(t, pointsErr)
+				assert.NotNil(t, pointsResp)
+				if !assert.NotEmpty(t, pointsResp.Points) {
+					return
+				}
+
+				c.Request.Destination = delivery.Destination{
+					Type:            c.Request.LastMilePolicy.DestinationType(),
+					PlatformStation: &delivery.PlatformStation{PlatformID: pointsResp.Points[0].ID},
+				}
+			case delivery.LMP_TimeInterval:
+				intervalsResp, intervalsErr := d.GetDeliveryIntervals(false, c.Request.LastMilePolicy, delivery.DeliveryIntervalsRequest{
+					Source:      delivery.Source{PlatformStationID: c.Request.Source.PlatformStation.PlatformID},
+					Destination: delivery.Destination{Address: "Москва, пр-кт Вернадского 91к2"},
+					Places:      c.Request.Places,
+				})
+				assert.Nil(t, intervalsErr)
+				assert.NotNil(t, intervalsResp)
+				if !assert.NotEmpty(t, intervalsResp.Offers) {
+					return
+				}
+
+				c.Request.Destination = delivery.Destination{
+					Type: c.Request.LastMilePolicy.DestinationType(),
+					IntervalUTC: &delivery.IntervalUTC{
+						From: intervalsResp.Offers[0].From,
+						To:   intervalsResp.Offers[0].To,
+					},
+					CustomLocation: &delivery.CustomLocation{
+						Details: delivery.Address{
+							FullAddress: "Москва, проспект Вернадского, 91к2",
+						},
+					},
+				}
+			default:
+				t.Error("не корректный вариант доставки")
+				t.FailNow()
+				return
+			}
 
 			// Шаг 3: Создаем Offer.
-			offerResp, offerErr := d.CreateOffer(c.CreateOfferReq)
+			offerResp, offerErr := d.CreateOffer(c.Request)
 			if c.HasError {
 				assert.NotNil(t, offerErr)
 				assert.Nil(t, offerResp)
@@ -455,17 +575,23 @@ func TestDelivery_CreateOrderWOEditing(t *testing.T) {
 			}
 			assert.Nil(t, offerErr)
 			assert.NotNil(t, offerResp)
+			if !assert.NotEmpty(t, offerResp.Offers) {
+				return
+			}
 
 			// Шаг 4: Подтверждаем созданный Offer.
 			confirmResp, confirmErr := d.ConfirmOffer(offerResp.Offers[0].OfferID)
-			assert.Nil(t, confirmErr)
-			assert.NotNil(t, confirmResp)
+			assert.Nil(t, confirmErr, "%v", confirmErr)
+			if !assert.NotNil(t, confirmResp) {
+				return
+			}
 
 			// Шаг 5: Создаем Request на основе подтвержденного оффера.
-			c.CreateRequestReq.Source.PlatformStationID = c.CreateOfferReq.Source.PlatformStationID
-			createReqResp, createReqErr := d.CreateRequest(c.CreateRequestReq)
+			createReqResp, createReqErr := d.CreateRequest(delivery.CreateRequestRequest(c.Request))
 			assert.Nil(t, createReqErr)
-			assert.NotNil(t, createReqResp)
+			if !assert.NotNil(t, createReqResp) {
+				return
+			}
 
 			// Шаг 6: Генерация ярлыков и получения акта приема/передачи.
 			// Эти методы возвращают ошибки "не реализовано", поэтому просто проверим их правильную обработку.

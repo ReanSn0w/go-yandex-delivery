@@ -99,6 +99,7 @@ func (d *Delivery) CreateOffer(req CreateOfferRequest) (*CreateOfferResponse, er
 func (d *Delivery) ConfirmOffer(offerID string) (*ConfirmOfferResponse, error) {
 	resp := ConfirmOfferResponse{}
 	err := d.request("/offers/confirm").
+		SetMethod(http.MethodPost).
 		SetBody(map[string]any{"offer_id": offerID}).
 		Do(&resp)
 	return &resp, err
@@ -118,6 +119,7 @@ func (d *Delivery) GetRequestInfo(requestID string, slim bool) (*GetRequestInfoR
 func (d *Delivery) GetRequestsInfo(from, to time.Time, requestsIds ...string) (*GetRequestsInfoResponse, error) {
 	res := GetRequestsInfoResponse{}
 	err := d.request("/requests/info").
+		SetMethod(http.MethodPost).
 		SetBody(map[string]any{
 			"from":        from.Format(time.RFC3339),
 			"to":          to.Format(time.RFC3339),
@@ -166,6 +168,7 @@ func (d *Delivery) GetRequestHistory(requestID string) (*GetRequestHistoryRespon
 func (d *Delivery) CancelRequest(requestID string) (*CancelRequestResponse, error) {
 	resp := CancelRequestResponse{}
 	err := d.request("/request/cancel").
+		SetMethod(http.MethodPost).
 		SetBody(map[string]any{"request_id": requestID}).
 		Do(&resp)
 	return &resp, err
@@ -175,6 +178,7 @@ func (d *Delivery) CancelRequest(requestID string) (*CancelRequestResponse, erro
 func (d *Delivery) CreateRequest(req CreateRequestRequest) (*CreateRequestResponse, error) {
 	resp := CreateRequestResponse{}
 	err := d.request("/request/create").
+		SetMethod(http.MethodPost).
 		SetHeader("Accept-Language", "ru").
 		SetQuery("send_unix", "true").
 		SetBody(req).
